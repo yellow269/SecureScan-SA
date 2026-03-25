@@ -1,0 +1,159 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+  EXPIRED
+  PENDING
+}
+
+enum PlanInterval {
+  MONTHLY
+}
+
+enum ScanStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum Severity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model User {
+  id                String   @id @default(cuid())
+  email             String   @unique
+  passwordHash     String
+  role              UserRole @default(USER)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  websites         Website[]
+  subscriptions    Subscription[]
+  scanAlerts       ScanAlert[]
+  schedules        ScanSchedule[]
+}
+
+model Website {
+  id            String   @id @default(cuid())
+  userId        String
+  domain        String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  lastScannedAt DateTime?
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scans         Scan[]
+
+  @@index([userId])
+  @@index([domain])
+}
+
+model Scan {
+  id          String     @id @default(cuid())
+  websiteId  String
+  status      ScanStatus @default(QUEUED)
+  score       Int?
+  rawReport   Json?
+  createdAt   DateTime   @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  error       String?
+
+  website     Website   @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  findings    Vulnerability[]
+
+  @@index([websiteId])
+}
+
+model Vulnerability {
+  id               String    @id @default(cuid())
+  scanId          String
+  issueType       String
+  severity        Severity
+  explanation     String
+  recommendedFix String
+
+  scan             Scan      @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  createdAt        DateTime  @default(now())
+
+  @@index([scanId])
+}
+
+model SubscriptionPlan {
+  id             String         @id @default(cuid())
+  name           String         @unique
+  priceZar       Int
+  websitesLimit Int
+  interval       PlanInterval  @default(MONTHLY)
+  createdAt      DateTime      @default(now())
+
+  subscriptions  Subscription[]
+}
+
+model Subscription {
+  id               String               @id @default(cuid())
+  userId           String
+  planId           String
+  status           SubscriptionStatus  @default(PENDING)
+
+  payfastBillingReference String?     @unique
+  currentPeriodEnd       DateTime?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan             SubscriptionPlan   @relation(fields: [planId], references: [id])
+
+  @@index([userId])
+}
+
+model ScanSchedule {
+  id          String   @id @default(cuid())
+  userId      String
+  websiteId   String
+  cadence     String   // daily | weekly | monthly
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  website     Website  @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, websiteId, cadence])
+  @@index([userId])
+  @@index([websiteId])
+}
+
+model ScanAlert {
+  id             String   @id @default(cuid())
+  userId         String
+  scanId         String?
+  websiteId      String?
+  message        String
+  createdAt      DateTime @default(now())
+  readAt         DateTime?
+
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+

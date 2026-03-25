@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: securescan
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  zap:
+    image: zaproxy/zap-stable:latest
+    ports:
+      - "8080:8080"
+    environment:
+      # Set ZAP API key in the container if desired; optional.
+      - ZAP_AUTH_APIKEY=${ZAP_API_KEY:-}
+
+volumes:
+  postgres_data:
+
